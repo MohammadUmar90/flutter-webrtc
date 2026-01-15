@@ -20,11 +20,7 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
     public void waitForCameraOpen() {
         Log.d(TAG, "CameraEventsHandler.waitForCameraOpen");
         while (state != CameraState.OPENED && state != CameraState.ERROR) {
-            try {
-                // Thread.sleep(1);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            // Thread.sleep(1);
         }
     }
 
