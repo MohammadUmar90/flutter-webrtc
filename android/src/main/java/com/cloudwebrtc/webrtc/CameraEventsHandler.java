@@ -19,33 +19,17 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
     private final Object stateLock = new Object();
 
     public void waitForCameraOpen() {
-        Log.d(TAG, "CameraEventsHandler.waitForCameraOpen");
-        synchronized (stateLock) {
-            while (state != CameraState.OPENED && state != CameraState.ERROR) {
-                try {
-                    stateLock.wait(100); // Wait with timeout to avoid indefinite blocking
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    Log.e(TAG, "waitForCameraOpen interrupted", e);
-                    return;
-                }
-            }
-        }
+        Log.d(TAG, "CameraEventsHandler.waitForCameraOpen - non-blocking, camera will initialize asynchronously");
+        // Completely non-blocking - camera initialization happens asynchronously via callbacks
+        // The camera will be ready when onFirstFrameAvailable() or onCameraError() is called
+        // No need to block any thread
     }
 
     public void waitForCameraClosed() {
-        Log.d(TAG, "CameraEventsHandler.waitForCameraClosed");
-        synchronized (stateLock) {
-            while (state != CameraState.CLOSED && state != CameraState.ERROR) {
-                try {
-                    stateLock.wait(100); // Wait with timeout to avoid indefinite blocking
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    Log.e(TAG, "waitForCameraClosed interrupted", e);
-                    return;
-                }
-            }
-        }
+        Log.d(TAG, "CameraEventsHandler.waitForCameraClosed - non-blocking, camera will close asynchronously");
+        // Completely non-blocking - camera closing happens asynchronously via callbacks
+        // The camera will be closed when onCameraClosed() is called
+        // No need to block any thread
     }
 
     private void setState(CameraState newState) {
