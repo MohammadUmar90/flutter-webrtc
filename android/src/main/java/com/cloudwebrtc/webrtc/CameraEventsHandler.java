@@ -1,5 +1,6 @@
 package com.cloudwebrtc.webrtc;
 
+import android.os.Looper;
 import android.util.Log;
 
 import org.webrtc.CameraVideoCapturer;
@@ -19,17 +20,67 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
     private final Object stateLock = new Object();
 
     public void waitForCameraOpen() {
-        Log.d(TAG, "CameraEventsHandler.waitForCameraOpen - non-blocking, camera will initialize asynchronously");
-        // Completely non-blocking - camera initialization happens asynchronously via callbacks
-        // The camera will be ready when onFirstFrameAvailable() or onCameraError() is called
-        // No need to block any thread
+        Log.d(TAG, "CameraEventsHandler.waitForCameraOpen");
+        boolean isMainThread = Looper.getMainLooper().getThread() == Thread.currentThread();
+        
+        // Use very short wait times to avoid blocking UI while allowing camera to initialize
+        long maxWaitTime = isMainThread ? 100 : 300; // 100ms on main thread, 300ms on background
+        long waitInterval = 10; // Check every 10ms
+        long startTime = System.currentTimeMillis();
+        
+        synchronized (stateLock) {
+            // Quick check first - if already ready, return immediately
+            if (state == CameraState.OPENED || state == CameraState.ERROR) {
+                return;
+            }
+            
+            while (state != CameraState.OPENED && state != CameraState.ERROR) {
+                long elapsed = System.currentTimeMillis() - startTime;
+                if (elapsed >= maxWaitTime) {
+                    Log.d(TAG, "waitForCameraOpen: timeout after " + elapsed + "ms, state: " + state + " (camera will continue initializing asynchronously)");
+                    return;
+                }
+                try {
+                    stateLock.wait(waitInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.d(TAG, "waitForCameraOpen interrupted, camera will continue initializing");
+                    return;
+                }
+            }
+        }
     }
 
     public void waitForCameraClosed() {
-        Log.d(TAG, "CameraEventsHandler.waitForCameraClosed - non-blocking, camera will close asynchronously");
-        // Completely non-blocking - camera closing happens asynchronously via callbacks
-        // The camera will be closed when onCameraClosed() is called
-        // No need to block any thread
+        Log.d(TAG, "CameraEventsHandler.waitForCameraClosed");
+        boolean isMainThread = Looper.getMainLooper().getThread() == Thread.currentThread();
+        
+        // Use very short wait times to avoid blocking UI
+        long maxWaitTime = isMainThread ? 100 : 300; // 100ms on main thread, 300ms on background
+        long waitInterval = 10; // Check every 10ms
+        long startTime = System.currentTimeMillis();
+        
+        synchronized (stateLock) {
+            // Quick check first - if already closed, return immediately
+            if (state == CameraState.CLOSED || state == CameraState.ERROR) {
+                return;
+            }
+            
+            while (state != CameraState.CLOSED && state != CameraState.ERROR) {
+                long elapsed = System.currentTimeMillis() - startTime;
+                if (elapsed >= maxWaitTime) {
+                    Log.d(TAG, "waitForCameraClosed: timeout after " + elapsed + "ms, state: " + state + " (camera will continue closing asynchronously)");
+                    return;
+                }
+                try {
+                    stateLock.wait(waitInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.d(TAG, "waitForCameraClosed interrupted, camera will continue closing");
+                    return;
+                }
+            }
+        }
     }
 
     private void setState(CameraState newState) {
