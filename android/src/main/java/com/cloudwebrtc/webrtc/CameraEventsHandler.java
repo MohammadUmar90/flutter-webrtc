@@ -16,22 +16,42 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
     }
     private final static String TAG = FlutterWebRTCPlugin.TAG;
     private CameraState state = CameraState.NEW;
+    private final Object stateLock = new Object();
 
     public void waitForCameraOpen() {
         Log.d(TAG, "CameraEventsHandler.waitForCameraOpen");
-        while (state != CameraState.OPENED && state != CameraState.ERROR) {
-            // Thread.sleep(1);
+        synchronized (stateLock) {
+            while (state != CameraState.OPENED && state != CameraState.ERROR) {
+                try {
+                    stateLock.wait(100); // Wait with timeout to avoid indefinite blocking
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.e(TAG, "waitForCameraOpen interrupted", e);
+                    return;
+                }
+            }
         }
     }
 
     public void waitForCameraClosed() {
         Log.d(TAG, "CameraEventsHandler.waitForCameraClosed");
-        while (state != CameraState.CLOSED && state != CameraState.ERROR) {
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+        synchronized (stateLock) {
+            while (state != CameraState.CLOSED && state != CameraState.ERROR) {
+                try {
+                    stateLock.wait(100); // Wait with timeout to avoid indefinite blocking
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.e(TAG, "waitForCameraClosed interrupted", e);
+                    return;
+                }
             }
+        }
+    }
+
+    private void setState(CameraState newState) {
+        synchronized (stateLock) {
+            state = newState;
+            stateLock.notifyAll();
         }
     }
 
@@ -40,41 +60,41 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
     @Override
     public void onCameraError(String errorDescription) {
         Log.d(TAG, String.format("CameraEventsHandler.onCameraError: errorDescription=%s", errorDescription));
-        state = CameraState.ERROR;
+        setState(CameraState.ERROR);
     }
 
     // Called when camera is disconnected.
     @Override
     public void onCameraDisconnected() {
         Log.d(TAG, "CameraEventsHandler.onCameraDisconnected");
-        state = CameraState.DISCONNECTED;
+        setState(CameraState.DISCONNECTED);
     }
 
     // Invoked when camera stops receiving frames
     @Override
     public void onCameraFreezed(String errorDescription) {
         Log.d(TAG, String.format("CameraEventsHandler.onCameraFreezed: errorDescription=%s", errorDescription));
-        state = CameraState.FREEZED;
+        setState(CameraState.FREEZED);
     }
 
     // Callback invoked when camera is opening.
     @Override
     public void onCameraOpening(String cameraName) {
         Log.d(TAG, String.format("CameraEventsHandler.onCameraOpening: cameraName=%s", cameraName));
-        state = CameraState.OPENING;
+        setState(CameraState.OPENING);
     }
 
     // Callback invoked when first camera frame is available after camera is opened.
     @Override
     public void onFirstFrameAvailable() {
         Log.d(TAG, "CameraEventsHandler.onFirstFrameAvailable");
-        state = CameraState.OPENED;
+        setState(CameraState.OPENED);
     }
 
     // Callback invoked when camera closed.
     @Override
     public void onCameraClosed() {
-        Log.d(TAG, "CameraEventsHandler.onFirstFrameAvailable");
-        state = CameraState.CLOSED;
+        Log.d(TAG, "CameraEventsHandler.onCameraClosed");
+        setState(CameraState.CLOSED);
     }
 }
