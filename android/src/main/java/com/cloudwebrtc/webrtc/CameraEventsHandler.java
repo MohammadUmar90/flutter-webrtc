@@ -55,8 +55,15 @@ class CameraEventsHandler implements CameraVideoCapturer.CameraEventsHandler {
         Log.d(TAG, "CameraEventsHandler.waitForCameraClosed");
         boolean isMainThread = Looper.getMainLooper().getThread() == Thread.currentThread();
         
-        // Use very short wait times to avoid blocking UI
-        long maxWaitTime = isMainThread ? 100 : 300; // 100ms on main thread, 300ms on background
+        // Don't block main thread at all - camera closing happens asynchronously via callbacks
+        // The real blocking issue is in SurfaceTextureHelper.stopListening() which is a WebRTC library call
+        if (isMainThread) {
+            Log.d(TAG, "Skipping wait on main thread to avoid blocking UI (camera will close asynchronously)");
+            return;
+        }
+        
+        // On background threads, allow a short wait
+        long maxWaitTime = 300; // 300ms max on background threads
         long waitInterval = 10; // Check every 10ms
         long startTime = System.currentTimeMillis();
         
