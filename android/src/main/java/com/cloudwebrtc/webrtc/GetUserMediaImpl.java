@@ -853,17 +853,29 @@ public class GetUserMediaImpl {
                 mVideoCapturers.remove(id);
                 SurfaceTextureHelper helper = mSurfaceTextureHelpers.get(id);
                 if (helper != null) {
-                    // Move blocking stopListening() call to background thread to avoid blocking main thread
+                    mSurfaceTextureHelpers.remove(id);
+                    // Post stopListening() to helper's handler thread asynchronously to avoid blocking main thread
+                    // The helper will clean up asynchronously - we don't wait for it
                     final SurfaceTextureHelper finalHelper = helper;
-                    new Thread(() -> {
+                    Handler helperHandler = finalHelper.getHandler();
+                    if (helperHandler != null) {
+                        helperHandler.post(() -> {
+                            try {
+                                finalHelper.stopListening();
+                                finalHelper.dispose();
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error stopping SurfaceTextureHelper", e);
+                            }
+                        });
+                    } else {
+                        // Fallback: if handler is null, just dispose (shouldn't happen normally)
+                        Log.w(TAG, "SurfaceTextureHelper handler is null, disposing directly");
                         try {
-                            finalHelper.stopListening();
                             finalHelper.dispose();
                         } catch (Exception e) {
-                            Log.e(TAG, "Error stopping SurfaceTextureHelper", e);
+                            Log.e(TAG, "Error disposing SurfaceTextureHelper", e);
                         }
-                    }).start();
-                    mSurfaceTextureHelpers.remove(id);
+                    }
                 }
             }
         }
