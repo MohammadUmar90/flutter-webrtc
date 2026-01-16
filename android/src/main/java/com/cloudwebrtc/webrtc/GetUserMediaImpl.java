@@ -853,8 +853,16 @@ public class GetUserMediaImpl {
                 mVideoCapturers.remove(id);
                 SurfaceTextureHelper helper = mSurfaceTextureHelpers.get(id);
                 if (helper != null) {
-                    helper.stopListening();
-                    helper.dispose();
+                    // Move blocking stopListening() call to background thread to avoid blocking main thread
+                    final SurfaceTextureHelper finalHelper = helper;
+                    new Thread(() -> {
+                        try {
+                            finalHelper.stopListening();
+                            finalHelper.dispose();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error stopping SurfaceTextureHelper", e);
+                        }
+                    }).start();
                     mSurfaceTextureHelpers.remove(id);
                 }
             }
